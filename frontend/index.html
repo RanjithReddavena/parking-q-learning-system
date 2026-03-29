@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>🤖 Car Learning to Park - Q-Learning Demo</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="app">
+
+<header class="header">
+
+<div class="header-title">
+<i class="fas fa-robot"></i>
+<h1>Reinforcement Learning Based Autonomous Parking System</h1>
+</div>
+
+<div class="connection-status" id="connectionStatus">
+<span class="status-dot disconnected"></span>
+<span id="statusText">Not Connected</span>
+</div>
+
+</header>
+
+
+<div class="explanation-card">
+
+<div class="explanation-item">
+<span class="exp-icon">🎯</span>
+<div class="exp-text">
+<strong>GOAL:</strong> AGENT(vehicle) must reach the GREEN parking spot.
+</div>
+</div>
+
+<div class="explanation-item">
+<span class="exp-icon">🧠</span>
+<div class="exp-text">
+<strong>LEARNING:</strong> Agent explores the environment and updates its policy based on rewards.
+</div>
+</div>
+
+<div class="explanation-item">
+<span class="exp-icon">📈</span>
+<div class="exp-text">
+<strong>PROGRESS:</strong> Rewards increase as the vehicle improves its parking performance.
+</div>
+</div>
+
+</div>
+
+
+<div class="main-content">
+
+
+<div class="visualization-area">
+
+<div class="section-header">
+
+<h2>
+<i class="fas fa-eye"></i> Watch the AI Learn
+</h2>
+
+<div class="simple-legend">
+
+<span>
+<span class="legend-dot spot"></span> Parking Spot (Goal)
+</span>
+
+<span>
+<span class="legend-dot obstacle"></span> Obstacle (Don't Hit!)
+</span>
+
+<span>
+<span class="legend-dot car"></span> Car (Learning)
+</span>
+
+<span>
+<span class="legend-dot success"></span> Success! (Parked)
+</span>
+
+</div>
+
+</div>
+
+
+<div class="canvas-wrapper">
+
+<canvas id="parkingCanvas" width="700" height="450"></canvas>
+
+</div>
+
+
+<!-- ONLY BUTTON SECTION (BOTTOM) -->
+
+<div class="simple-controls">
+
+<button id="startBtn" class="btn btn-learn">
+<i class="fas fa-play"></i> START LEARNING
+</button>
+
+<button id="stopBtn" class="btn btn-stop" disabled>
+<i class="fas fa-stop"></i> STOP
+</button>
+
+<button id="resetBtn" class="btn btn-reset">
+<i class="fas fa-redo"></i> RESET
+</button>
+
+<button id="saveBtn" class="btn btn-save">
+<i class="fas fa-save"></i> SAVE BRAIN
+</button>
+
+<button id="showQTableBtn" class="btn btn-qtable">
+<i class="fas fa-table"></i> SHOW Q-TABLE
+</button>
+
+</div>
+
+
+<div class="live-status" id="liveStatus">
+<i class="fas fa-info-circle"></i>
+<span>Click START to begin training the AI</span>
+</div>
+
+</div>
+
+
+<div class="stats-area">
+
+<div class="stats-grid">
+
+<div class="stat-card">
+<div class="stat-icon">🎮</div>
+<div class="stat-content">
+<span class="stat-label">Attempt #</span>
+<span class="stat-value" id="episode">0</span>
+</div>
+</div>
+
+<div class="stat-card">
+<div class="stat-icon">💰</div>
+<div class="stat-content">
+<span class="stat-label">Reward</span>
+<span class="stat-value" id="reward">0</span>
+<span class="stat-desc">(higher = better)</span>
+</div>
+</div>
+
+<div class="stat-card">
+<div class="stat-icon">📏</div>
+<div class="stat-content">
+<span class="stat-label">Distance</span>
+<span class="stat-value" id="distance">0m</span>
+<span class="stat-desc">to parking spot</span>
+</div>
+</div>
+
+<div class="stat-card">
+<div class="stat-icon">🎲</div>
+<div class="stat-content">
+<span class="stat-label">Randomness</span>
+<span class="stat-value" id="epsilon">0.5</span>
+<span class="stat-desc">(goes down over time)</span>
+</div>
+</div>
+
+<div class="stat-card">
+<div class="stat-icon">👣</div>
+<div class="stat-content">
+<span class="stat-label">Steps Taken</span>
+<span class="stat-value" id="steps">0</span>
+<span class="stat-desc">in current attempt</span>
+</div>
+</div>
+
+<div class="stat-card">
+<div class="stat-icon">🏆</div>
+<div class="stat-content">
+<span class="stat-label">Success Rate</span>
+<span class="stat-value" id="successRate">0%</span>
+<span class="stat-desc">of all attempts</span>
+</div>
+</div>
+
+</div>
+
+
+<div class="graph-card">
+
+<div class="graph-header">
+<h3><i class="fas fa-chart-line"></i> Is the AI Learning?</h3>
+<span class="graph-hint">(Reward should go UP over time)</span>
+</div>
+
+<div class="graph-wrapper">
+<canvas id="rewardChart"></canvas>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<footer class="footer">
+<p>🧠 This AI learns by trying, failing, and remembering - just like humans!</p>
+</footer>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
