@@ -1,6 +1,6 @@
-// ===== SIMPLE CONFIGURATION WITH MORE OBSTACLES =====
+// ===== SIMPLE CONFIGURATION WITH  OBSTACLES =====
 const CONFIG = {
-    API_URL: 'http://127.0.0.1:8000',
+    API_URL: 'https://parking-q-learning-system.onrender.com',
     MAX_HISTORY: 50,
     // 🚧 8 OBSTACLES - Much more challenging! 🚧
     OBSTACLES: [
