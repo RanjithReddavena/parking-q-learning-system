@@ -1,6 +1,7 @@
-// ===== SIMPLE CONFIGURATION WITH  OBSTACLES =====
+// ===== SIMPLE CONFIGURATION WITH OBSTACLES =====
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const CONFIG = {
-    API_URL: 'https://parking-q-learning-system.onrender.com',
+    API_URL: isLocalhost ? 'http://127.0.0.1:8001' : 'https://parking-q-learning-system.onrender.com',
     MAX_HISTORY: 50,
     // 🚧 8 OBSTACLES - Much more challenging! 🚧
     OBSTACLES: [
@@ -21,16 +22,16 @@ const CONFIG = {
 const state = {
     trainingActive: false,
     eventSource: null,
+    showOptimalPath: true,
+    numCars: 1,
     currentData: {
-        x: 10, 
-        y: 10,
-        reward: 0,
+        cars: [
+            { x: 10, y: 10, reward: 0, success: false, collision: false, steps: 0, distance: 0 }
+        ],
+        optimal_path: [],
         episode: 0,
         epsilon: 0.5,
-        steps: 0,
-        distance: 0,
-        success: false,
-        collision: false
+        reward: 0
     },
     history: {
         episodes: [],
@@ -55,6 +56,12 @@ const elements = {
     saveBtn: document.getElementById('saveBtn'),
     showQTableBtn: document.getElementById('showQTableBtn'),
     
+    // Settings elements
+    speedSlider: document.getElementById('speedSlider'),
+    speedVal: document.getElementById('speedVal'),
+    carSelector: document.getElementById('carSelector'),
+    pathToggle: document.getElementById('pathToggle'),
+    
     // Status displays
     connectionStatus: document.getElementById('connectionStatus'),
     statusText: document.getElementById('statusText'),
@@ -78,6 +85,10 @@ console.log('Elements found:', {
     resetBtn: !!elements.resetBtn,
     saveBtn: !!elements.saveBtn,
     showQTableBtn: !!elements.showQTableBtn,
+    speedSlider: !!elements.speedSlider,
+    speedVal: !!elements.speedVal,
+    carSelector: !!elements.carSelector,
+    pathToggle: !!elements.pathToggle,
     episode: !!elements.episode,
     reward: !!elements.reward,
     distance: !!elements.distance,
@@ -106,8 +117,10 @@ function updateHappeningNow(message) {
     }
 }
 
-// ===== DRAW THE PARKING LOT (with 8 obstacles) =====
-function drawCar(x, y, isSuccess) {
+// ===== DRAW THE PARKING LOT & CARS =====
+const CAR_COLORS = ['#4a6fa5', '#8e44ad', '#1abc9c', '#e67e22', '#2ecc71'];
+
+function drawEnvironment() {
     if (!ctx) return;
     
     // Clear canvas
@@ -183,50 +196,81 @@ function drawCar(x, y, isSuccess) {
         // Obstacle number (small)
         ctx.font = 'bold 10px Arial';
         ctx.fillStyle = 'white';
-        // Finding index for display - simplified
         const index = CONFIG.OBSTACLES.findIndex(obs => obs[0] === ox && obs[1] === oy) + 1;
         ctx.fillText(index, obsX - 3, obsY - 15);
     });
     
-    // ===== DRAW THE CAR (BLUE - The Learner) =====
-    const carX = (x / 60) * width;
-    const carY = height - (y / 40) * height;
-    
-    // Car shadow
-    ctx.shadowColor = '#4a6fa5';
-    ctx.shadowBlur = 20;
-    
-    // Car body (blue normally, yellow when successful)
-    ctx.fillStyle = isSuccess ? '#ffd166' : '#4a6fa5';
-    ctx.fillRect(carX - 20, carY - 15, 40, 30);
-    
-    // Windows
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.fillRect(carX - 12, carY - 10, 24, 6);
-    
-    // Wheels
-    ctx.shadowBlur = 10;
-    ctx.fillStyle = '#2c3e50';
-    ctx.fillRect(carX - 25, carY - 20, 8, 6);  // Front left
-    ctx.fillRect(carX + 17, carY - 20, 8, 6);  // Front right
-    ctx.fillRect(carX - 25, carY + 14, 8, 6);  // Rear left
-    ctx.fillRect(carX + 17, carY + 14, 8, 6);  // Rear right
-    
-    // Reset shadow
-    ctx.shadowBlur = 0;
-    
-    // Car label
-    ctx.font = 'bold 12px Arial';
-    ctx.fillStyle = 'white';
-    ctx.fillText('🚗', carX - 8, carY - 18);
-    
-    // Draw distance text if far from goal
-    const distance = Math.sqrt((x - CONFIG.PARKING_SPOT[0])**2 + (y - CONFIG.PARKING_SPOT[1])**2);
-    if (distance > 5) {
-        ctx.font = '12px Arial';
-        ctx.fillStyle = '#aaa';
-        ctx.fillText(`Distance: ${distance.toFixed(1)}m`, 10, 30);
+    // ===== DRAW OPTIMAL PATH (RED DASHED LINE) =====
+    if (state.showOptimalPath && state.currentData.optimal_path && state.currentData.optimal_path.length > 0) {
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 6]);
+        ctx.shadowColor = '#ff6b6b';
+        ctx.shadowBlur = 10;
+        
+        ctx.beginPath();
+        state.currentData.optimal_path.forEach(([px, py], idx) => {
+            const canvasX = (px / 60) * width;
+            const canvasY = height - (py / 40) * height;
+            if (idx === 0) {
+                ctx.moveTo(canvasX, canvasY);
+            } else {
+                ctx.lineTo(canvasX, canvasY);
+            }
+        });
+        ctx.stroke();
+        
+        // Reset path styling
+        ctx.setLineDash([]);
+        ctx.shadowBlur = 0;
     }
+    
+    // ===== DRAW THE CARS =====
+    const cars = state.currentData.cars || [];
+    cars.forEach((car, index) => {
+        const carX = (car.x / 60) * width;
+        const carY = height - (car.y / 40) * height;
+        const baseColor = CAR_COLORS[index % CAR_COLORS.length];
+        
+        // Car shadow
+        ctx.shadowColor = baseColor;
+        ctx.shadowBlur = car.success ? 25 : 15;
+        
+        // Car body (blue normally, yellow when successful, red when crashed)
+        let carColor = baseColor;
+        if (car.success) {
+            carColor = '#ffd166';
+        } else if (car.collision) {
+            carColor = '#ef4444';
+        }
+        
+        ctx.fillStyle = carColor;
+        ctx.fillRect(carX - 20, carY - 15, 40, 30);
+        
+        // Windows
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(carX - 12, carY - 10, 24, 6);
+        
+        // Wheels
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#2c3e50';
+        ctx.fillRect(carX - 25, carY - 20, 8, 6);  // Front left
+        ctx.fillRect(carX + 17, carY - 20, 8, 6);  // Front right
+        ctx.fillRect(carX - 25, carY + 14, 8, 6);  // Rear left
+        ctx.fillRect(carX + 17, carY + 14, 8, 6);  // Rear right
+        
+        // Car label index
+        ctx.font = 'bold 11px Arial';
+        ctx.fillStyle = 'white';
+        ctx.fillText(`🚗#${index + 1}`, carX - 14, carY - 18);
+        
+        // Draw distance text for first car
+        if (index === 0 && car.distance > 5) {
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#aaa';
+            ctx.fillText(`Distance: ${car.distance.toFixed(1)}m`, 10, 30);
+        }
+    });
 }
 
 // ===== REWARD CHART SETUP =====
@@ -324,36 +368,56 @@ function connectToStream() {
             const data = JSON.parse(e.data);
             state.currentData = data;
             
-            // Update canvas with new position
-            drawCar(data.x, data.y, data.success);
+            // Draw all elements including cars and optimal path
+            drawEnvironment();
             
             // Update stats display
             if (elements.episode) elements.episode.textContent = data.episode;
             if (elements.reward) elements.reward.textContent = data.reward.toFixed(1);
-            if (elements.distance) elements.distance.textContent = data.distance.toFixed(1) + 'm';
             if (elements.epsilon) elements.epsilon.textContent = data.epsilon.toFixed(3);
-            if (elements.steps) elements.steps.textContent = data.steps;
             
-            // Track successes
-            if (data.success) {
+            // Display first car's stats for standard display
+            if (data.cars && data.cars.length > 0) {
+                const primaryCar = data.cars[0];
+                if (elements.distance) elements.distance.textContent = primaryCar.distance.toFixed(1) + 'm';
+                if (elements.steps) elements.steps.textContent = primaryCar.steps;
+            }
+            
+            // Check for success or collision across cars
+            let successFound = false;
+            let collisionFound = false;
+            let successIdx = -1;
+            let collisionIdx = -1;
+            
+            data.cars.forEach((car, index) => {
+                if (car.success) {
+                    successFound = true;
+                    successIdx = index + 1;
+                }
+                if (car.collision) {
+                    collisionFound = true;
+                    collisionIdx = index + 1;
+                }
+            });
+            
+            if (successFound) {
                 state.stats.successes++;
-                updateHappeningNow('🎉 SUCCESS! Car parked perfectly! 🎉');
-                updateStatusMessage('🎉 Success! The AI learned to park!');
-            } 
-            // Track collisions
-            else if (data.collision) {
-                updateHappeningNow('💥 OOPS! Hit obstacle ' + getObstacleNumber(data.x, data.y) + '. Learning from mistake...');
-            } 
-            // Track progress
-            else {
-                if (data.distance < 5) {
-                    updateHappeningNow('🟢 Getting VERY close to the spot! Almost there!');
-                } else if (data.distance < 10) {
-                    updateHappeningNow('🟡 Moving closer to the goal... Keep going!');
-                } else if (data.episode > 0 && data.episode % 10 === 0) {
-                    updateHappeningNow('📊 Episode ' + data.episode + ' - AI is learning patterns');
-                } else {
-                    updateHappeningNow('🔵 Exploring the parking lot...');
+                updateHappeningNow(`🎉 SUCCESS! Car #${successIdx} parked perfectly! 🎉`);
+                updateStatusMessage(`🎉 Success! Car #${successIdx} learned to park!`);
+            } else if (collisionFound) {
+                updateHappeningNow(`💥 OOPS! Car #${collisionIdx} crashed. Learning from mistake...`);
+            } else {
+                // Regular updates
+                const activeCars = data.cars.filter(c => !c.done);
+                if (activeCars.length > 0) {
+                    const closestDistance = Math.min(...activeCars.map(c => c.distance));
+                    if (closestDistance < 5) {
+                        updateHappeningNow('🟢 Getting VERY close to the spot! Almost there!');
+                    } else if (closestDistance < 10) {
+                        updateHappeningNow('🟡 Moving closer to the goal... Keep going!');
+                    } else {
+                        updateHappeningNow(`🔵 ${activeCars.length} car(s) exploring the parking lot...`);
+                    }
                 }
             }
             
@@ -873,12 +937,10 @@ async function saveModel() {
     }
 }
 
-// ===== ADD EVENT LISTENERS TO BUTTONS =====
+// ===== ADD EVENT LISTENERS =====
 if (elements.startBtn) {
     elements.startBtn.addEventListener('click', startTraining);
     console.log('Start button listener added');
-} else {
-    console.error('Start button not found!');
 }
 
 if (elements.stopBtn) {
@@ -899,18 +961,70 @@ if (elements.saveBtn) {
 if (elements.showQTableBtn) {
     elements.showQTableBtn.addEventListener('click', showQTable);
     console.log('Show Q-Table button listener added');
-} else {
-    console.error('Show Q-Table button not found! Check if id="showQTableBtn" exists in HTML');
+}
+
+// Dynamic speed slider listener
+if (elements.speedSlider) {
+    elements.speedSlider.addEventListener('input', (e) => {
+        const val = parseInt(e.target.value);
+        if (elements.speedVal) elements.speedVal.textContent = val + 'x';
+        
+        // Map 1x-20x speed multiplier to step delay
+        const delay = val === 20 ? 0.0001 : 0.05 / val;
+        
+        fetch(`${CONFIG.API_URL}/set-speed?speed=${delay}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => console.log('Speed set to delay:', data.step_delay))
+            .catch(err => console.error('Error setting speed:', err));
+    });
+}
+
+// Car count selector buttons
+if (elements.carSelector) {
+    elements.carSelector.addEventListener('click', (e) => {
+        const btn = e.target.closest('.segment');
+        if (!btn) return;
+        
+        // Remove active class and add to clicked
+        elements.carSelector.querySelectorAll('.segment').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        
+        const count = parseInt(btn.dataset.cars);
+        state.numCars = count;
+        
+        fetch(`${CONFIG.API_URL}/set-cars?count=${count}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                console.log('Cars set count to:', data.num_cars);
+                // Reset local visual state to draw initial empty list of new cars size
+                state.currentData.cars = Array.from({ length: count }, () => ({
+                    x: 10, y: 10, success: false, collision: false, steps: 0, distance: 0
+                }));
+                drawEnvironment();
+            })
+            .catch(err => console.error('Error setting cars:', err));
+    });
+}
+
+// Show optimal path toggle
+if (elements.pathToggle) {
+    elements.pathToggle.addEventListener('change', (e) => {
+        state.showOptimalPath = e.target.checked;
+        drawEnvironment();
+    });
 }
 
 // ===== INITIAL SETUP =====
 function initialize() {
     console.log('Initializing application...');
-    // Draw initial car position
-    drawCar(10, 10, false);
+    // Initialize default car list
+    state.currentData.cars = Array.from({ length: state.numCars }, () => ({
+        x: 10, y: 10, success: false, collision: false, steps: 0, distance: 0
+    }));
+    drawEnvironment();
     
     // Set initial messages
-    updateStatusMessage('👋Click START to observe the reinforcement learning agent performing autonomous vehicle parking.');
+    updateStatusMessage('👋 Click START to observe the reinforcement learning agent performing autonomous vehicle parking.');
     updateHappeningNow('⏸️ System ready. Click START to begin!');
     
     // Check connection on load
@@ -934,7 +1048,7 @@ function initialize() {
                 if (elements.statusText) {
                     elements.statusText.textContent = 'Disconnected';
                 }
-                updateHappeningNow('⚠️ Backend not running. Run: uvicorn main:app --reload');
+                updateHappeningNow('⚠️ Backend not running. Run: uvicorn app.main:app --reload');
                 console.warn('Backend not reachable');
             });
     }, 500);

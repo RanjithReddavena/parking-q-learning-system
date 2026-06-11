@@ -464,6 +464,167 @@ body {
     font-size: 0.9rem;
 }
 
+/* ===== SETTINGS PANEL ===== */
+.settings-panel {
+    display: grid;
+    grid-template-columns: 1.2fr 1.2fr 1.6fr;
+    gap: 20px;
+    background: #f8f9fc;
+    padding: 20px;
+    border-radius: 18px;
+    margin-bottom: 20px;
+    border: 1.5px solid #e2e8f0;
+}
+
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+}
+
+.settings-group label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4a5568;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.settings-group label i {
+    color: #4ecdc4;
+}
+
+/* Modern Slider */
+.modern-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: #cbd5e1;
+    outline: none;
+    transition: background 0.3s;
+}
+
+.modern-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #4ecdc4;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(78, 205, 196, 0.5);
+    transition: transform 0.1s, background-color 0.2s;
+}
+
+.modern-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    background: #3cbdb2;
+}
+
+/* Segmented Control for Cars */
+.segmented-control {
+    display: flex;
+    background: #e2e8f0;
+    padding: 4px;
+    border-radius: 10px;
+    gap: 4px;
+}
+
+.segment {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 8px;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4a5568;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.segment:hover {
+    background: rgba(255,255,255,0.4);
+}
+
+.segment.active {
+    background: white;
+    color: #1a202c;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+/* Toggle Group & Switch */
+.toggle-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: .3s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #4ecdc4;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+.toggle-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4a5568;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+}
+
+.toggle-label i {
+    color: #ff6b6b;
+}
+
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1000px) {
     .main-content {
@@ -472,6 +633,11 @@ body {
     
     .explanation-card {
         grid-template-columns: 1fr;
+    }
+
+    .settings-panel {
+        grid-template-columns: 1fr;
+        gap: 15px;
     }
     
     .simple-controls {

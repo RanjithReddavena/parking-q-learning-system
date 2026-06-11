@@ -1,5 +1,6 @@
 import random
 import math
+import numpy as np
 
 
 class ParkingEnvironment:
@@ -11,11 +12,11 @@ class ParkingEnvironment:
         # Parking goal
         self.parking_spot = (45, 30)
 
-        # Obstacles
+        # Obstacles (aligned exactly with script.js)
         self.obstacles = [
-            (15, 25),
-            (25, 35),
-            (35, 15),
+            (12, 18),
+            (22, 28),
+            (32, 15),
             (28, 32),
             (38, 22),
             (18, 35),
@@ -30,82 +31,129 @@ class ParkingEnvironment:
         # Episode settings
         self.steps = 0
         self.max_steps = 200
+        self.cars = []
 
     # 🔁 Reset environment
-    def reset(self):
-        self.car_x = random.uniform(0, 20)
-        self.car_y = random.uniform(0, 20)
+    def reset(self, num_cars=1):
+        self.cars = []
+        for _ in range(num_cars):
+            x = random.uniform(0, 20)
+            y = random.uniform(0, 20)
+            state = self.get_state(x, y)
+            self.cars.append({
+                "x": x,
+                "y": y,
+                "steps": 0,
+                "done": False,
+                "success": False,
+                "collision": False,
+                "distance": math.sqrt((x - self.parking_spot[0])**2 + (y - self.parking_spot[1])**2),
+                "state": state
+            })
+        
+        # Legacy single car compatibility
+        self.car_x = self.cars[0]["x"]
+        self.car_y = self.cars[0]["y"]
         self.steps = 0
-        return self.get_state()
+        return self.cars[0]["state"]
 
-    # 📍 Get discrete state
-    def get_state(self):
-        distance = self.get_distance()
+    # 📍 Get discrete state (384 non-overlapping states)
+    def get_state(self, x=None, y=None):
+        if x is None:
+            x = self.car_x
+        if y is None:
+            y = self.car_y
 
-        x_bin = min(int(self.car_x / 10), 5)
-        y_bin = min(int(self.car_y / 10), 5)
-        dist_bin = min(int(distance / 20), 3)
+        # Grid size 60x40. Cell size 2.5x2.5.
+        # X has 24 bins (0 to 23). Y has 16 bins (0 to 15).
+        x_bin = max(0, min(23, int(x / 2.5)))
+        y_bin = max(0, min(15, int(y / 2.5)))
 
-        state = x_bin * 12 + y_bin * 2 + dist_bin
-        return min(state, 59)
+        return x_bin * 16 + y_bin
 
-    # 📏 Distance to parking spot
+    # 📏 Distance to parking spot (legacy helper)
     def get_distance(self):
         return math.sqrt(
             (self.car_x - self.parking_spot[0]) ** 2 +
             (self.car_y - self.parking_spot[1]) ** 2
         )
 
-    # 🚗 Step function
-    def step(self, action):
-        self.steps += 1
+    # 🚗 Step a specific car
+    def step_car(self, car_idx, action):
+        car = self.cars[car_idx]
+        if car["done"]:
+            return car["state"], 0.0, True, car
 
-        old_distance = self.get_distance()
+        car["steps"] += 1
+        old_x, old_y = car["x"], car["y"]
+        old_distance = math.sqrt(
+            (old_x - self.parking_spot[0]) ** 2 +
+            (old_y - self.parking_spot[1]) ** 2
+        )
+
         move_speed = 2.0
 
         # Actions
         if action == 1:   # LEFT
-            self.car_x -= move_speed
+            car["x"] -= move_speed
         elif action == 2: # RIGHT
-            self.car_x += move_speed
+            car["x"] += move_speed
         elif action == 3: # UP
-            self.car_y += move_speed
+            car["y"] += move_speed
         elif action == 4: # DOWN
-            self.car_y -= move_speed
-        # action 0 = STAY
-        # action 5 = PARK (handled in reward)
+            car["y"] -= move_speed
+        # action 0 = STAY, action 5 = PARK (handled in reward)
 
         # Boundary check
-        self.car_x = max(self.x_min, min(self.x_max, self.car_x))
-        self.car_y = max(self.y_min, min(self.y_max, self.car_y))
+        car["x"] = max(self.x_min, min(self.x_max, car["x"]))
+        car["y"] = max(self.y_min, min(self.y_max, car["y"]))
 
-        new_distance = self.get_distance()
+        new_distance = math.sqrt(
+            (car["x"] - self.parking_spot[0]) ** 2 +
+            (car["y"] - self.parking_spot[1]) ** 2
+        )
+        car["distance"] = new_distance
 
         # Collision detection
         collision = any(
-            math.sqrt((self.car_x - ox)**2 + (self.car_y - oy)**2) < 2.0
+            math.sqrt((car["x"] - ox)**2 + (car["y"] - oy)**2) < 2.0
             for ox, oy in self.obstacles
         )
 
         # Success condition
         success = new_distance < 2.0
 
-        # 🎯 Reward calculation
+        # Reward calculation
         reward = self._calculate_reward(old_distance, new_distance, collision, success, action)
 
-        done = success or collision or self.steps >= self.max_steps
+        car["success"] = success
+        car["collision"] = collision
+        car["done"] = success or collision or car["steps"] >= self.max_steps
+        car["state"] = self.get_state(car["x"], car["y"])
 
-        return self.get_state(), reward, done, {
-            "x": self.car_x,
-            "y": self.car_y,
-            "distance": new_distance,
-            "success": success,
-            "collision": collision
+        # Update legacy single car attributes if this is the main car
+        if car_idx == 0:
+            self.car_x = car["x"]
+            self.car_y = car["y"]
+            self.steps = car["steps"]
+
+        return car["state"], reward, car["done"], car
+
+    # 🚗 Legacy Step function for single car compatibility
+    def step(self, action):
+        if not self.cars:
+            self.reset(1)
+        next_state, reward, done, car_info = self.step_car(0, action)
+        return next_state, reward, done, {
+            "x": car_info["x"],
+            "y": car_info["y"],
+            "distance": car_info["distance"],
+            "success": car_info["success"],
+            "collision": car_info["collision"]
         }
 
     # 🧠 Reward function (VERY IMPORTANT)
     def _calculate_reward(self, old_dist, new_dist, collision, success, action):
-
         if success:
             return 100.0
 
@@ -133,3 +181,61 @@ class ParkingEnvironment:
             reward -= 20
 
         return reward
+
+    # 🎯 Find optimal path using current Q-table
+    def get_optimal_path(self, agent, start_x=10.0, start_y=10.0):
+        path = []
+        curr_x = start_x
+        curr_y = start_y
+        visited = set()
+
+        for _ in range(50):
+            path.append((curr_x, curr_y))
+
+            dist = math.sqrt(
+                (curr_x - self.parking_spot[0]) ** 2 +
+                (curr_y - self.parking_spot[1]) ** 2
+            )
+            if dist < 2.0:
+                break
+
+            state = self.get_state(curr_x, curr_y)
+            action = int(np.argmax(agent.q_table[state]))
+
+            # If action is STAY or PARK, stop tracing path
+            if action == 0 or action == 5:
+                break
+
+            move_speed = 2.0
+            next_x, next_y = curr_x, curr_y
+            if action == 1:   # LEFT
+                next_x -= move_speed
+            elif action == 2: # RIGHT
+                next_x += move_speed
+            elif action == 3: # UP
+                next_y += move_speed
+            elif action == 4: # DOWN
+                next_y -= move_speed
+
+            # Boundary check
+            next_x = max(self.x_min, min(self.x_max, next_x))
+            next_y = max(self.y_min, min(self.y_max, next_y))
+
+            # Collision check (stop tracing if collides)
+            collision = any(
+                math.sqrt((next_x - ox)**2 + (next_y - oy)**2) < 2.0
+                for ox, oy in self.obstacles
+            )
+            if collision:
+                path.append((next_x, next_y))
+                break
+
+            # Loop detection
+            pos_bin = (round(next_x, 1), round(next_y, 1))
+            if pos_bin in visited:
+                break
+            visited.add(pos_bin)
+
+            curr_x, curr_y = next_x, next_y
+
+        return path

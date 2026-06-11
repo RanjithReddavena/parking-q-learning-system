@@ -4,7 +4,7 @@ import random
 
 
 class QLearningAgent:
-    def __init__(self, num_states=60, num_actions=6):
+    def __init__(self, num_states=384, num_actions=6):
         self.num_states = num_states
         self.num_actions = num_actions
 

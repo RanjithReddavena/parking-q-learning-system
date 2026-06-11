@@ -59,3 +59,15 @@ async def stream():
         trainer.training_loop(),
         media_type="text/event-stream"
     )
+
+
+@router.post("/set-speed")
+def set_speed(speed: float):
+    trainer.set_speed(speed)
+    return {"status": "speed set", "speed": speed}
+
+
+@router.post("/set-cars")
+def set_cars(count: int):
+    trainer.set_num_cars(count)
+    return {"status": "num_cars set", "num_cars": count}
